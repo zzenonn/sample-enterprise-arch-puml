@@ -20,6 +20,7 @@
 !includeurl AzurePuml/Networking/AzureFirewall.puml
 !includeurl AzurePuml/Networking/AzurePrivateLink.puml
 !includeurl AzurePuml/Integration/AzureServiceBus.puml
+!includeurl AzurePuml/Networking/AzureDNS.puml
 
 ' Kubernetes Resources
 !includeurl KubernetesPuml/kubernetes_Context.puml
@@ -37,15 +38,21 @@ skinparam ranksep 20
 
 Boundary(azure, "Azure Cloud") {
     Boundary(azurerg, "Azure Resource Group") {
-        ' AzureVirtualNetwork(azurevn, "Azure VNet", "10.0.0.0/16")' 
+        AzureDNS(azuredns,"DNS","api.adb.internal")
 
         Boundary(azurevn,"azure-vnet", "10.1.0.0/16") {
 			Boundary(azuregw,"Hub", "10.1.255.0/24") {
 				AzureVPNGateway(avpn, "Azure VPN Gateway", "VPN Gateway")
 				AzureBastion(azurebastion, "Azure Bastion", "Bastion Host/Jumpbox")
-				AzureFirewall(firewall, "Firewall", "Firewall")
+				AzureFirewall(firewall, "Firewall", "Intersubnet Traffic")
 				AzurePrivateLink(azureprivatelink, "Azure Private Link", "Expose Private APIs to Private Network")
 			}
+
+			Boundary(azureutil,"Utility", "10.1.100.0/24") {
+
+				AzureServiceBus(azureservicebus, "Azure Service Bus", "Message Broker")
+			}
+
 			Boundary(azureprod,"Production", "10.1.1.0/24") {
 				Cluster_Boundary(cluster, "Kubernetes Cluster") {
 
@@ -74,35 +81,34 @@ Boundary(azure, "Azure Cloud") {
                 AzureSqlDatabase(azuredb, "Azure DB", "Azure SQL Database")
 			}
 
-			Boundary(azureutil,"Utility", "10.1.100.0/24") {
-				Cluster_Boundary(cluster, "Kubernetes Cluster") {
-
-					AzureServiceBus(azureservicebus, "Azure Service Bus", "Firewall")
-
-				}
-
-                AzureSqlDatabase(azuredb, "Azure DB", "Azure SQL Database")
-			}
+			
 		}
     }
 }
 
 Boundary(onprem, "On-Premises Environment") {
-    Boundary(onprem-net,"onprem-net", "10.2.0.0/16") {
-        Boundary(onpremdef,"Production", "10.1.1.0/24") {
+    Boundary(onpremnet,"onprem-net", "10.2.0.0/16") {
+        Boundary(onpremprod,"Production", "10.2.1.0/24") {
 			Component(onpremsrv, "On-Premises Finance Server", "Handles the Finance Service")
             ContainerDb(onpremdb, "On-Premises Database", "Stores application data")
 		}
 		Boundary(onprem-gw,"Gateway", "10.2.255.0/24") {
 			AzureVPNGateway(onpremgw, "On-Premises VPN Gateway", "Establishes VPN connection")
 		}
+
+		Boundary(onpremshared,"Shared Services", "10.2.100.0/24") {
+			Component(onprempam, "PAM", "Privilage Access Management")
+		}
 		
 	}
     
 }
 
-Lay_U(firewall,avpn)
-Lay_R(azureprivatelink,firewall)
+Lay_R(firewall,avpn)
+Lay_D(azurebastion,firewall)
+Lay_R(azureprivatelink,azurebastion)
+
+Lay_D(onpremgw,onpremshared)
 
 'Rel_R(avm, azuredb, "Reads/Writes")
 Rel_D(onpremsrv, onpremdb, "Reads/Writes")
@@ -124,8 +130,16 @@ BiRel_U(azuredb,podproj3,"accesses data", "project pod")
 BiRel_U(azuredb,podrep1,"accesses data", "report pods")
 BiRel_U(azuredb,podrep2,"accesses data", "report pods")
 
-Rel(podproj1,azureprivatelink,"ServiceBus API connection", "project pod")
-Rel(podproj2,azureprivatelink,"ServiceBus API connection", "project pod")
-Rel(podproj3,azureprivatelink,"ServiceBus API connection", "project pod")
+
+'Messaging
+'Rel(podproj1,azureprivatelink,"ServiceBus API connection", "project pod")
+'Rel(podproj2,azureprivatelink,"ServiceBus API connection", "project pod")
+
+Rel_D(podproj3,azureservicebus,"send message","Through PrivateLink and Firewall")
+Rel_U(azureservicebus,onpremsrv,"receive message","Through PrivateLink and Firewall")
+Lay_D(onpremsrv,azureprivatelink)
+
+'DNS 
+BiRel_U(onpremsrv,azuredns,"DNS Query","Through PrivateLink and Firewall")
 
 @enduml
