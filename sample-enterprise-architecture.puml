@@ -19,6 +19,7 @@
 !includeurl AzurePuml/Networking/AzureBastion.puml
 !includeurl AzurePuml/Networking/AzureFirewall.puml
 !includeurl AzurePuml/Networking/AzurePrivateLink.puml
+!includeurl AzurePuml/Integration/AzureServiceBus.puml
 
 ' Kubernetes Resources
 !includeurl KubernetesPuml/kubernetes_Context.puml
@@ -40,13 +41,19 @@ Boundary(azure, "Azure Cloud") {
 
         Boundary(azurevn,"azure-vnet", "10.1.0.0/16") {
 			Boundary(azuregw,"Hub", "10.1.255.0/24") {
-				AzureVPNGateway(avpn, "VPN Gateway", "Azure VPN Gateway")
-				AzureBastion(azurebastion, "Bastion", "AzureBastion")
+				AzureVPNGateway(avpn, "Azure VPN Gateway", "VPN Gateway")
+				AzureBastion(azurebastion, "Azure Bastion", "Bastion Host/Jumpbox")
 				AzureFirewall(firewall, "Firewall", "Firewall")
-				AzurePrivateLink(AzurePrivateLink, "Private Link", "Azure Private Link")
+				AzurePrivateLink(azureprivatelink, "Azure Private Link", "Expose Private APIs to Private Network")
 			}
-			Boundary(azuredef,"Production", "10.1.1.0/24") {
+			Boundary(azureprod,"Production", "10.1.1.0/24") {
 				Cluster_Boundary(cluster, "Kubernetes Cluster") {
+
+					Namespace_Boundary(nsReport, "Reporting") {
+						KubernetesSvc(repsvc, "Reporting Service", "")
+						KubernetesPod(podrep1, "", "")
+						KubernetesPod(podrep2, "","")
+					}
 
 					Namespace_Boundary(nsBackEnd, "Project and Grants") {
 						KubernetesSvc(projsvc, "Project Service", "")
@@ -55,18 +62,23 @@ Boundary(azure, "Azure Cloud") {
 						KubernetesPod(podproj3, "", "")
 					}
 
-					Namespace_Boundary(nsUtil, "Finance") {
-						KubernetesSvc(finsvc, "Finance Service", "")
-						KubernetesPod(podfin1, "", "")
-						KubernetesPod(podfin2, "","")
-					}
+					'Namespace_Boundary(nsUtil, "Finance") {'
+					'	KubernetesSvc(finsvc, "Finance Service", "")'
+					'	KubernetesPod(podfin1, "", "")'
+					'	KubernetesPod(podfin2, "","")'
+					'}'
 
-					Namespace_Boundary(nsReport, "Reporting") {
-						KubernetesSvc(repsvc, "Reporting Service", "")
-						KubernetesPod(podrep1, "", "")
-						KubernetesPod(podrep2, "","")
-						KubernetesPod(podrep3, "","")
-					}
+					
+				}
+
+                AzureSqlDatabase(azuredb, "Azure DB", "Azure SQL Database")
+			}
+
+			Boundary(azureutil,"Utility", "10.1.100.0/24") {
+				Cluster_Boundary(cluster, "Kubernetes Cluster") {
+
+					AzureServiceBus(azureservicebus, "Azure Service Bus", "Firewall")
+
 				}
 
                 AzureSqlDatabase(azuredb, "Azure DB", "Azure SQL Database")
@@ -77,8 +89,8 @@ Boundary(azure, "Azure Cloud") {
 
 Boundary(onprem, "On-Premises Environment") {
     Boundary(onprem-net,"onprem-net", "10.2.0.0/16") {
-        Boundary(onpremdef,"Default", "10.1.1.0/24") {
-			Component(onpremsrv, "On-Premises Server", "Handles user requests")
+        Boundary(onpremdef,"Production", "10.1.1.0/24") {
+			Component(onpremsrv, "On-Premises Finance Server", "Handles the Finance Service")
             ContainerDb(onpremdb, "On-Premises Database", "Stores application data")
 		}
 		Boundary(onprem-gw,"Gateway", "10.2.255.0/24") {
@@ -90,7 +102,7 @@ Boundary(onprem, "On-Premises Environment") {
 }
 
 Lay_U(firewall,avpn)
-Lay_R(azurebastion,firewall)
+Lay_R(azureprivatelink,firewall)
 
 'Rel_R(avm, azuredb, "Reads/Writes")
 Rel_D(onpremsrv, onpremdb, "Reads/Writes")
@@ -101,22 +113,19 @@ Rel(projsvc,podproj1,"exposes pods", "project pod")
 Rel(projsvc,podproj2,"exposes pods", "project pod")
 Rel(projsvc,podproj3,"exposes pods", "project pod")
 
-Rel(finsvc,podfin1,"exposes pods", "fin pod")
-Rel(finsvc,podfin2,"exposes pods", "fin pod")
-
 Rel(repsvc,podrep1,"exposes pods", "report pods")
 Rel(repsvc,podrep2,"exposes pods", "report pods")
-Rel(repsvc,podrep3,"exposes pods", "report pods")
 
+'DB
 BiRel_U(azuredb,podproj1,"accesses data", "project pod")
 BiRel_U(azuredb,podproj2,"accesses data", "project pod")
 BiRel_U(azuredb,podproj3,"accesses data", "project pod")
 
-BiRel_U(azuredb,podfin1,"accesses data", "fin pod")
-BiRel_U(azuredb,podfin2,"accesses data", "fin pod")
-
 BiRel_U(azuredb,podrep1,"accesses data", "report pods")
 BiRel_U(azuredb,podrep2,"accesses data", "report pods")
-BiRel_U(azuredb,podrep3,"accesses data", "report pods")
+
+Rel(podproj1,azureprivatelink,"ServiceBus API connection", "project pod")
+Rel(podproj2,azureprivatelink,"ServiceBus API connection", "project pod")
+Rel(podproj3,azureprivatelink,"ServiceBus API connection", "project pod")
 
 @enduml
