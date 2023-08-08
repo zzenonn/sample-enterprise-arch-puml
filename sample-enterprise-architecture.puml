@@ -1,0 +1,122 @@
+@startuml
+' plantuml-multi-cloud-diagrams
+
+!define C4Puml https://raw.githubusercontent.com/RicardoNiepel/C4-PlantUML/master
+!define AzurePuml https://raw.githubusercontent.com/plantuml-stdlib/Azure-PlantUML/release/2-2/dist
+!define KubernetesPuml https://raw.githubusercontent.com/dcasati/kubernetes-PlantUML/master/dist
+
+!includeurl C4Puml/C4_Context.puml
+!includeurl C4Puml/C4_Component.puml
+!includeurl C4Puml/C4_Container.puml
+
+' Azure Resources
+!includeurl AzurePuml/AzureCommon.puml
+
+!includeurl AzurePuml/Compute/AzureVirtualMachine.puml
+!includeurl AzurePuml/Databases/AzureSqlDatabase.puml
+!includeurl AzurePuml/Networking/AzureVirtualNetwork.puml
+!includeurl AzurePuml/Networking/AzureVPNGateway.puml
+!includeurl AzurePuml/Networking/AzureBastion.puml
+!includeurl AzurePuml/Networking/AzureFirewall.puml
+!includeurl AzurePuml/Networking/AzurePrivateLink.puml
+
+' Kubernetes Resources
+!includeurl KubernetesPuml/kubernetes_Context.puml
+!includeurl KubernetesPuml/kubernetes_Simplified.puml
+
+!includeurl KubernetesPuml/OSS/KubernetesApi.puml
+!includeurl KubernetesPuml/OSS/KubernetesIng.puml
+!includeurl KubernetesPuml/OSS/KubernetesPod.puml
+!includeurl KubernetesPuml/OSS/KubernetesSvc.puml
+
+title Enterprise Integration Architecture
+
+skinparam nodesep 10
+skinparam ranksep 20
+
+Boundary(azure, "Azure Cloud") {
+    Boundary(azurerg, "Azure Resource Group") {
+        ' AzureVirtualNetwork(azurevn, "Azure VNet", "10.0.0.0/16")' 
+
+        Boundary(azurevn,"azure-vnet", "10.1.0.0/16") {
+			Boundary(azuregw,"Hub", "10.1.255.0/24") {
+				AzureVPNGateway(avpn, "VPN Gateway", "Azure VPN Gateway")
+				AzureBastion(azurebastion, "Bastion", "AzureBastion")
+				AzureFirewall(firewall, "Firewall", "Firewall")
+				AzurePrivateLink(AzurePrivateLink, "Private Link", "Azure Private Link")
+			}
+			Boundary(azuredef,"Production", "10.1.1.0/24") {
+				Cluster_Boundary(cluster, "Kubernetes Cluster") {
+
+					Namespace_Boundary(nsBackEnd, "Project and Grants") {
+						KubernetesSvc(projsvc, "Project Service", "")
+						KubernetesPod(podproj1, "", "")
+						KubernetesPod(podproj2, "", "")
+						KubernetesPod(podproj3, "", "")
+					}
+
+					Namespace_Boundary(nsUtil, "Finance") {
+						KubernetesSvc(finsvc, "Finance Service", "")
+						KubernetesPod(podfin1, "", "")
+						KubernetesPod(podfin2, "","")
+					}
+
+					Namespace_Boundary(nsReport, "Reporting") {
+						KubernetesSvc(repsvc, "Reporting Service", "")
+						KubernetesPod(podrep1, "", "")
+						KubernetesPod(podrep2, "","")
+						KubernetesPod(podrep3, "","")
+					}
+				}
+
+                AzureSqlDatabase(azuredb, "Azure DB", "Azure SQL Database")
+			}
+		}
+    }
+}
+
+Boundary(onprem, "On-Premises Environment") {
+    Boundary(onprem-net,"onprem-net", "10.2.0.0/16") {
+        Boundary(onpremdef,"Default", "10.1.1.0/24") {
+			Component(onpremsrv, "On-Premises Server", "Handles user requests")
+            ContainerDb(onpremdb, "On-Premises Database", "Stores application data")
+		}
+		Boundary(onprem-gw,"Gateway", "10.2.255.0/24") {
+			AzureVPNGateway(onpremgw, "On-Premises VPN Gateway", "Establishes VPN connection")
+		}
+		
+	}
+    
+}
+
+Lay_U(firewall,avpn)
+Lay_R(azurebastion,firewall)
+
+'Rel_R(avm, azuredb, "Reads/Writes")
+Rel_D(onpremsrv, onpremdb, "Reads/Writes")
+Rel_R(onpremsrv, onpremgw, "Establishes VPN connection")
+BiRel_R(onpremgw, avpn, "VPN connection")
+
+Rel(projsvc,podproj1,"exposes pods", "project pod")
+Rel(projsvc,podproj2,"exposes pods", "project pod")
+Rel(projsvc,podproj3,"exposes pods", "project pod")
+
+Rel(finsvc,podfin1,"exposes pods", "fin pod")
+Rel(finsvc,podfin2,"exposes pods", "fin pod")
+
+Rel(repsvc,podrep1,"exposes pods", "report pods")
+Rel(repsvc,podrep2,"exposes pods", "report pods")
+Rel(repsvc,podrep3,"exposes pods", "report pods")
+
+BiRel_U(azuredb,podproj1,"accesses data", "project pod")
+BiRel_U(azuredb,podproj2,"accesses data", "project pod")
+BiRel_U(azuredb,podproj3,"accesses data", "project pod")
+
+BiRel_U(azuredb,podfin1,"accesses data", "fin pod")
+BiRel_U(azuredb,podfin2,"accesses data", "fin pod")
+
+BiRel_U(azuredb,podrep1,"accesses data", "report pods")
+BiRel_U(azuredb,podrep2,"accesses data", "report pods")
+BiRel_U(azuredb,podrep3,"accesses data", "report pods")
+
+@enduml
