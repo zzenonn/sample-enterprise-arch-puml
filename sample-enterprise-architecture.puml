@@ -1,9 +1,15 @@
 @startuml
 ' plantuml-multi-cloud-diagrams
 
+
 !define C4Puml https://raw.githubusercontent.com/RicardoNiepel/C4-PlantUML/master
 !define AzurePuml https://raw.githubusercontent.com/plantuml-stdlib/Azure-PlantUML/release/2-2/dist
 !define KubernetesPuml https://raw.githubusercontent.com/dcasati/kubernetes-PlantUML/master/dist
+!define FONTAWESOME https://raw.githubusercontent.com/tupadr3/plantuml-icon-font-sprites/master/font-awesome-5
+!define DEVICONS https://raw.githubusercontent.com/tupadr3/plantuml-icon-font-sprites/master/devicons
+
+!include FONTAWESOME/users.puml
+!include DEVICONS/angular.puml
 
 !includeurl C4Puml/C4_Context.puml
 !includeurl C4Puml/C4_Component.puml
@@ -37,10 +43,14 @@ title Enterprise Integration Architecture
 skinparam nodesep 10
 skinparam ranksep 20
 
+
+Person(analyst, "ADB Analyst", "People that apply for project grants", $sprite="users")
+Container(spa, "SPA", "angular", "The main interface that the users interacts with", $sprite="angular")
+Person(user, "Applicants", "People that apply for project grants", $sprite="users")
+
 Boundary(azure, "Azure Cloud") {
     Boundary(azurerg, "Azure Resource Group") {
-        AzureAPIManagement(azureapim,"Azure APIM","api.adb.internal")
-		AzureAPIManagement(azureapim, "Azure APIM", "API Gateway")
+        AzureAPIManagement(azureapim,"Azure APIM","api.adb.org")
 
         Boundary(azurevn,"azure-vnet", "10.1.0.0/16") {
 			Boundary(azuregw,"Hub", "10.1.255.0/24") {
@@ -50,10 +60,8 @@ Boundary(azure, "Azure Cloud") {
 				AzurePrivateLink(azureprivatelink, "Azure Private Link", "Expose Private APIs to Private Network")
 			}
 
-			Boundary(azureutil,"Utility", "10.1.100.0/24") {
 
-				AzureServiceBus(azureservicebus, "Azure Service Bus", "Finance Message Broker")
-			}
+			AzureServiceBus(azureservicebus, "Azure Service Bus", "Finance Message Broker")
 
 			Boundary(azureprod,"Production", "10.1.1.0/24") {
 				Cluster_Boundary(cluster, "Kubernetes Cluster") {
@@ -111,7 +119,6 @@ Lay_D(azurebastion,firewall)
 Lay_R(azureprivatelink,azurebastion)
 
 Lay_D(onpremgw,onpremshared)
-Lay_D(azureapim,azuredns)
 
 Lay_R(azureapim,azuregw)
 
@@ -140,15 +147,20 @@ BiRel_U(azuredb,podrep2,"accesses data", "report pods")
 'Rel(podproj1,azureprivatelink,"ServiceBus API connection", "project pod")
 'Rel(podproj2,azureprivatelink,"ServiceBus API connection", "project pod")
 
-Rel_D(podproj3,azureservicebus,"send message","Through PrivateLink and Firewall")
-Rel_U(azureservicebus,onpremsrv,"receive message","Through PrivateLink and Firewall")
+Rel_D(podproj3,azureservicebus,"send message for finance","Through PrivateLink and Firewall")
+Rel_U(azureservicebus,onpremsrv,"receive message from project","Through PrivateLink and Firewall")
 Lay_D(onpremsrv,azureprivatelink)
 
 'API 
-Rel_U(onpremsrv,azureapim,"send callback","Through PrivateLink and Firewall")
-Rel(azureapim,projsvc,"send request")
+BiRel_U(onpremsrv,azureapim,"send callback","Through PrivateLink and Firewall")
+BiRel(azureapim,projsvc,"send callback from finance\nsend calls from users","api.adb.internal/projects/callback\napi.adb.org/projects/{method}")
+BiRel(azureapim,repsvc,"send calls from analysts","api.adb.org/reporting/{method}")
 
-' API
-'Rel(onpremsrv,azureapim,"send callback","Through PrivateLink and Firewall")
+
+Rel_L(user, spa, "Uses", "https")
+Rel_R(analyst, spa, "Uses", "https")
+
+Rel(spa,azureapim,"send user and analyst requests", "https")
+
 
 @enduml
