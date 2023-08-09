@@ -21,6 +21,7 @@
 !includeurl AzurePuml/Networking/AzurePrivateLink.puml
 !includeurl AzurePuml/Integration/AzureServiceBus.puml
 !includeurl AzurePuml/Networking/AzureDNS.puml
+!includeurl AzurePuml/Web/AzureAPIManagement.puml
 
 ' Kubernetes Resources
 !includeurl KubernetesPuml/kubernetes_Context.puml
@@ -38,7 +39,8 @@ skinparam ranksep 20
 
 Boundary(azure, "Azure Cloud") {
     Boundary(azurerg, "Azure Resource Group") {
-        AzureDNS(azuredns,"DNS","api.adb.internal")
+        AzureAPIManagement(azureapim,"Azure APIM","api.adb.internal")
+		AzureAPIManagement(azureapim, "Azure APIM", "API Gateway")
 
         Boundary(azurevn,"azure-vnet", "10.1.0.0/16") {
 			Boundary(azuregw,"Hub", "10.1.255.0/24") {
@@ -50,7 +52,7 @@ Boundary(azure, "Azure Cloud") {
 
 			Boundary(azureutil,"Utility", "10.1.100.0/24") {
 
-				AzureServiceBus(azureservicebus, "Azure Service Bus", "Message Broker")
+				AzureServiceBus(azureservicebus, "Azure Service Bus", "Finance Message Broker")
 			}
 
 			Boundary(azureprod,"Production", "10.1.1.0/24") {
@@ -109,6 +111,9 @@ Lay_D(azurebastion,firewall)
 Lay_R(azureprivatelink,azurebastion)
 
 Lay_D(onpremgw,onpremshared)
+Lay_D(azureapim,azuredns)
+
+Lay_R(azureapim,azuregw)
 
 'Rel_R(avm, azuredb, "Reads/Writes")
 Rel_D(onpremsrv, onpremdb, "Reads/Writes")
@@ -139,7 +144,11 @@ Rel_D(podproj3,azureservicebus,"send message","Through PrivateLink and Firewall"
 Rel_U(azureservicebus,onpremsrv,"receive message","Through PrivateLink and Firewall")
 Lay_D(onpremsrv,azureprivatelink)
 
-'DNS 
-BiRel_U(onpremsrv,azuredns,"DNS Query","Through PrivateLink and Firewall")
+'API 
+Rel_U(onpremsrv,azureapim,"send callback","Through PrivateLink and Firewall")
+Rel(azureapim,projsvc,"send request")
+
+' API
+'Rel(onpremsrv,azureapim,"send callback","Through PrivateLink and Firewall")
 
 @enduml
