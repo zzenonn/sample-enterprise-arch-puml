@@ -1,4 +1,4 @@
-@startuml plantuml-multi-cloud-diagrams
+@startuml plantuml-sample-enterprise-architecture
 
 
 !define C4Puml https://raw.githubusercontent.com/RicardoNiepel/C4-PlantUML/master
