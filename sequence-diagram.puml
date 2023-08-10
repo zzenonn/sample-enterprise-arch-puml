@@ -1,0 +1,29 @@
+@startuml enterprise-sequence-diagram
+
+'left to right direction
+
+hide footbox
+
+actor "Grant Applicant" as applicant
+actor "ADB Analyst" as analyst
+
+participant "Reporting Service" as reportingsvc
+participant "Project and Grant Service" as projectsvc
+participant "Finance Service" as financesvc
+queue "Finance Message Broker" as financequeue
+database "Database" as database
+
+database -> reportingsvc : send aggregated data
+analyst -> reportingsvc : views dashboard
+applicant -> projectsvc : sends application
+projectsvc -> database : update project status
+projectsvc -> applicant : update application status (being processed)
+
+reportingsvc -> financequeue : enqueues transaction
+financequeue -> financesvc : dequeues and processes transaction
+financesvc -> projectsvc : update project status
+projectsvc -> database : update project status
+
+projectsvc -> applicant : update application status (funded)
+
+@enduml

@@ -1,0 +1,65 @@
+@startuml infrastructure-as-code-pipeline
+
+!define SPRITESURL https://raw.githubusercontent.com/plantuml-stdlib/gilbarbara-plantuml-sprites/v1.1/sprites
+!define C4Puml https://raw.githubusercontent.com/RicardoNiepel/C4-PlantUML/master
+!define DEVICONS https://raw.githubusercontent.com/tupadr3/plantuml-icon-font-sprites/master/devicons
+!define AzurePuml https://raw.githubusercontent.com/plantuml-stdlib/Azure-PlantUML/release/2-2/dist
+
+
+!includeurl DEVICONS/github.puml
+!includeurl DEVICONS/git_branch.puml
+!includeurl SPRITESURL/terraform.puml
+!includeurl SPRITESURL/packer.puml
+
+
+!includeurl AzurePuml/AzureCommon.puml
+!includeurl AzurePuml/DevOps/AzureDevOps.puml
+!includeurl AzurePuml/Compute/AzureSharedImageGallery.puml
+!includeurl AzurePuml/Compute/AzureImageClassic.puml
+!includeurl AzurePuml/Networking/AzureVPNGateway.puml
+!includeurl AzurePuml/Networking/AzureBastion.puml
+!includeurl AzurePuml/Networking/AzureFirewall.puml
+!includeurl AzurePuml/Networking/AzurePrivateLink.puml
+
+!includeurl C4Puml/C4_Context.puml
+!includeurl C4Puml/C4_Component.puml
+!includeurl C4Puml/C4_Container.puml
+
+
+ 
+
+left to right direction
+
+System_Boundary(terraformpipeline, "Terraform DevOps Pipeline") {
+    AzureDevOps(azureterraformworkspaces,"Terraform Workspaces","Plans and applies terraform")
+    rectangle "<$git_branch>" as workspace 
+    AzureDevOps(azureterraformmodules,"Terraform Modules","Plans and applies terraform")
+    rectangle "<$git_branch>" as modules
+}
+
+System_Boundary(azurevms, "VM Images") {
+    AzureSharedImageGallery(azureimagegallery, "Shared Image Gallery", "Images shared across projects")
+    AzureImageClassic(azureimage,"Golden Image", "Base image for all VMs")
+}
+
+System_Boundary(packrpipeline, "Packer") {
+    AzureDevOps(azuredevopspacker,"Packer Templates","Plans and applies terraform")
+    rectangle "<$git_branch>" as packr
+}
+
+
+
+Rel(azureterraformworkspaces, workspace,"azure infrastructure")
+Rel(azuredevopspacker,packr, "Golden Images")
+Rel(packr,azureimage,"builds", "devops pipeline",$sprite="packer")
+Rel(azureimage,azureimagegallery,"stored in")
+
+Rel(azureterraformmodules, modules,"reusable terraform modules")
+
+Rel(modules,workspace,"imports modules")
+Rel(azureimagegallery,workspace,"refers to images")
+
+Rel(workspace,azure,"provisions",$sprite="terraform")
+
+'$sprite="users"
+@enduml
